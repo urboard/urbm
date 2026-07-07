@@ -236,26 +236,29 @@
 /* ===== Cloud sync (optional) — paste your Firebase config to enable sharing across devices =====
    Leave as null for single-device (browser-local) use. See README. */
 const FIREBASE_CONFIG={
-  apiKey:"AIzaSyD-uqB5hculwYkTCQ8KWpB2mk_2YPwzfyg",
-  authDomain:"urgreenlane.firebaseapp.com",
-  databaseURL:"https://urgreenlane-default-rtdb.firebaseio.com",
-  projectId:"urgreenlane",
-  storageBucket:"urgreenlane.firebasestorage.app",
-  messagingSenderId:"529625112847",
-  appId:"1:529625112847:web:c1af51c483e6c85cfede7a",
-  measurementId:"G-RQ72QHJK79"
+  apiKey: "AIzaSyBNiPcGQ_1LYrR-3tp8Ub30dScyzTYBDyc",
+  authDomain: "urbm-d3279.firebaseapp.com",
+  databaseURL: "https://urbm-d3279-default-rtdb.asia-southeast1.firebasedatabase.app/", 
+  projectId: "urbm-d3279",
+  storageBucket: "urbm-d3279.firebasestorage.app",
+  messagingSenderId: "55973713707",
+  appId: "1:55973713707:web:b33e26eea374a15e1fd76e",
+  measurementId: ""
 };
 const FIREBASE_PATH="board";
-const LOGIN_DOMAIN="urgreenlane.local"; // staff type a username; app appends this to make the Firebase email
+const LOGIN_DOMAIN="urbm.local"; // Staff will type 'urbm' to log in
 
-const LS_KEY="roomFlowBoard_v4";
+const LS_KEY="roomFlowBoard_urbm_v4"; // Separates browser memory from the old branch
 const SEED_TX=["Goldius Glam","Alex","Pro Light","P7","Revive","E2","EXO-T","S Plus (Face)","S Plus (Neck)","HIFU (Face)","HIFU (Neck)","Oxy","SRW","Soft Laser","Radiesse","Filler","Botox","dePigmentation","Revital"];
 const SEED={
-  doctors:["Dr Cheryl","Dr Nicole","Dr Teh","Dr Chan","Dr Yi Wen","Dr Michelle","Dr Eunice"],
-  therapists:["Regina","Karene","Yunny","Xiao Wei","Chloe","Yan Yun","Katherine","Iris"],
-  treatments:[...SEED_TX],
-  groups:[{name:"Downstairs",rooms:["Con 1","Con 2","Room 1 (Alex)","Room 2 (Andy)"]},{name:"Upstairs",rooms:["R1","R2","R3","R4","Classroom","R5","R6","R7"]}],
-  customers:{}
+  doctors: ["Dr 1", "Dr 2"], // Type your new branch doctors here
+  therapists: ["Thera 1", "Thera 2"], // Type your new branch therapists here
+  treatments: [...SEED_TX],
+  groups: [
+    {name: "Downstairs", rooms: ["Room 1", "Room 2"]}, // Customize your room names here
+    {name: "Upstairs", rooms: ["Room 3", "Room 4"]}
+  ],
+  customers: {}
 };
 let state=migrate(load())||freshState();
 let editingDocId=null,editingDocRoom=null,editingTimeId=null,editingTheraRoom=null,editingMaskRoom=null;
@@ -274,8 +277,8 @@ function migrate(s){if(!s)return null;if(!s.completed)s.completed=[];if(!s.remov
   if(!s.occ||typeof s.occ!=='object')s.occ={};
   s.groups.forEach(g=>g.rooms.forEach(r=>{if(!(r in s.occ))s.occ[r]=null;}));
   if(!s.seq)s.seq=s.queue.reduce((m,q)=>Math.max(m,q.id||0),0)+1;
-  const BAD=["Dr Fong","Dr Agnes","Dr Yi Wen / Dr Fong"];const fixd=d=>d==="Dr Yi Wen / Dr Fong"?"Dr Yi Wen":(d||"");
-  if(s.doctors)s.doctors=s.doctors.filter(d=>!BAD.includes(d));
+  const BAD=[];const fixd=d=>(d||"");
+if(s.doctors)s.doctors=s.doctors.filter(d=>!BAD.includes(d));
   (s.queue||[]).forEach(q=>{if(q.arrivedAt===undefined)q.arrivedAt="";q.doctor=fixd(q.doctor);q.treatment=txArr(q.treatment);});
   Object.values(s.occ||{}).forEach(o=>{if(o){if(o.note===undefined)o.note="";if(o.nextRoom===undefined)o.nextRoom="";o.doctor=fixd(o.doctor);o.treatment=txArr(o.treatment);o.txDone=txArr(o.txDone);}});
   Object.values(s.customers||{}).forEach(c=>{if(c)c.doctor=fixd(c.doctor);});
