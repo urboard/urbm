@@ -55,7 +55,7 @@
   .btn{background:var(--accent);color:#fff;border:0;border-radius:7px;padding:8px 12px;font-weight:700;cursor:pointer;font-size:14px}
   .btn:hover{filter:brightness(1.07)}
   .btn.sm{padding:5px 9px;font-size:13px}.btn.grey{background:#e3e9eb;color:var(--ink)}.btn.red{background:#d9534f}
-  .layout{display:grid;grid-template-columns:1fr 372px;gap:16px;align-items:start}
+  .layout{display:grid;grid-template-columns:1fr 335px;gap:16px;align-items:start}
   @media(max-width:1050px){.layout{grid-template-columns:1fr}}
   .rightcol{position:sticky;top:64px;display:flex;flex-direction:column;gap:14px;max-height:calc(100vh - 80px);overflow:auto}
   .section-title{font-size:13px;font-weight:700;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin:6px 2px 10px}
@@ -72,20 +72,25 @@
   .room.maskOver .rhead{background:#ffd9d9;border-bottom-color:#e57373}
   @keyframes pulse{0%,100%{box-shadow:0 0 0 3px #ef9a9a}50%{box-shadow:0 0 0 6px #ef9a9a}}
   .room .rname{font-size:16px}
-  .room .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px}
+  .room .pill{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;white-space:nowrap;flex:none}
   .room.free .pill{background:#cfe9d6;color:#256b39}.room.occ .pill{background:#f6d8b3;color:#8a5212}.room.maskOver .pill{background:#e57373;color:#fff}
   .room.hasnext{border-color:#9cc0e0}.room.hasnext .pill{background:#cfe2f5;color:#1565c0}
   .nextbanner{background:#eaf3fb;border:1px dashed #9cc0e0;color:#1565c0;border-radius:8px;padding:5px 8px;font-size:12px;font-weight:700;margin-bottom:5px}
   .room.noThera{border-color:#c89be8}
   .noTheraBanner{background:#f3e8fd;border:1px solid #d6b3f0;color:#7b2cbf;border-radius:8px;padding:4px 8px;font-size:12px;font-weight:700;margin-bottom:5px}
   .tag.warn{background:#f3e8fd;color:#7b2cbf}
-  .timein{font-family:inherit;font-size:14px;padding:6px 8px;border:1px solid var(--line);border-radius:6px;background:#fff;color:var(--ink)}
+  .timein{font-family:inherit;font-size:14px;padding:1px 8px;border:1px solid transparent;border-bottom:1px dashed #c6d3d6;border-radius:6px;background:transparent;color:var(--ink)}
+  .timein::placeholder{color:#9fb0b4}
+  .timein:hover{border-bottom-color:var(--accent)}
+  .timein:focus{border:1px solid var(--accent);background:#fff;outline:none}
   .room .body{padding:10px 11px;display:flex;flex-direction:column;gap:7px;flex:1}
   .cust{font-size:17px;font-weight:700;line-height:1.15}
   .fieldrow{display:flex;align-items:flex-start;gap:6px;font-size:13px}
   .fieldrow label{width:54px;color:var(--muted);flex:none;padding-top:6px}
   .fieldrow select,.fieldrow .note-in{flex:1;min-width:0}
   .docline{font-weight:700;color:var(--head);font-size:13px}
+  /* only the narrow waiting-room card needs the name to truncate */
+  .witem .docline{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;display:inline-block;vertical-align:bottom}
   .docedit{background:none;border:0;cursor:pointer;color:var(--muted);font-size:13px;padding:0 4px;border-radius:4px}
   .docedit:hover{background:#eef3f4;color:var(--accent)}
   .mask b{font-variant-numeric:tabular-nums}
@@ -136,6 +141,8 @@
   .miniToggle.on{background:#e3eef0;border-color:var(--accent)}
   .notetext{font-size:13px;color:#8a5212;cursor:pointer;background:#fff3d6;border:1px solid #f0d48a;border-radius:7px;padding:4px 8px;display:inline-block;font-weight:600}
   .notetext:hover{border-color:var(--accent)}
+  .notelink{background:none;border:0;color:var(--muted);font-size:12px;font-weight:700;cursor:pointer;padding:2px 0;border-radius:4px}
+  .notelink:hover{color:var(--accent)}
   .witem.wmed{background:#fff8e1;border-color:#f0d48a}.witem.wlong{background:#fdeaea;border-color:#e9a3a3}
   .witem .wtop{display:flex;justify-content:space-between;align-items:baseline;gap:6px}
   .wmin{font-weight:800;font-variant-numeric:tabular-nums}
@@ -207,13 +214,14 @@
   <div class="layout">
     <div>
       <div class="arrive-bar">
-        <strong>Add / walk-in:</strong>
+        <strong>Add:</strong>
+        <span><button class="miniToggle" id="addModeAppt" onclick="setAddMode(false)">Appointment</button><button class="miniToggle" id="addModeWalk" onclick="setAddMode(true)">Walk-in</button></span>
         <input id="arriveName" list="custList" placeholder="Type or pick name…" style="min-width:170px">
         <datalist id="custList"></datalist>
         <select id="arriveDoc" title="Doctor" style="width:120px"></select>
         <input id="arriveTime" class="timein" placeholder="time e.g. 345" style="width:100px">
         <input id="arriveTx" list="txList" placeholder="Treatment" style="width:140px">
-        <button class="btn" onclick="arrive()">+ Add to queue</button>
+        <button class="btn" id="arriveBtn" onclick="arrive()">+ Add appointment</button>
       </div>
       <div id="roomsHost"></div>
     </div>
@@ -282,6 +290,8 @@ const FIREBASE_PATH="board";
 const LOGIN_DOMAIN="urbm.local"; // staff type a username; app appends this to make the Firebase email
 
 const LS_KEY="roomFlowBoard_urbm_v4";
+const LS_ADDMODE="urbm_v4_addWalkIn";
+let addWalkIn=localStorage.getItem(LS_ADDMODE)==="1"; // Appointment vs Walk-in, remembered per device
 const SEED_TX=["Goldius Glam","Alex","Pro Light","P7","Revive","E2","EXO-T","S Plus (Face)","S Plus (Neck)","HIFU (Face)","HIFU (Neck)","Oxy","SRW","Soft Laser","Radiesse","Filler","Botox","dePigmentation","Revital"];
 const SEED={
   doctors:["Dr Cheryl","Dr Nicole","Dr Teh","Dr Chan","Dr Yi Wen","Dr Michelle","Dr Eunice"],
@@ -291,10 +301,17 @@ const SEED={
   customers:{}
 };
 let state=migrate(load())||freshState();
-let editingDocId=null,editingDocRoom=null,editingTimeId=null,editingTheraRoom=null,editingMaskRoom=null,editingConsultRoom=null;
+let editingDocId=null,editingDocRoom=null,editingTimeId=null,editingTheraRoom=null,editingMaskRoom=null,editingConsultRoom=null,editingQTheraId=null;
 let expandedQ=null;
 let cloudRef=null,applyingRemote=false,saveTimer=null;
-let undoStack=[],histLast=null;const UNDO_MAX=5;
+/* Undo is PER-DEVICE and SINGLE-STEP, same rule as the v2 boards.
+   v1 keeps the whole board in ONE Firebase blob, so there are no per-field paths
+   to scope an undo to. We get the same effect by diffing: remember only the
+   entries this device's own last action actually changed, then put those exact
+   values back onto whatever the board looks like NOW. That means an undo can no
+   longer (a) restore a stale whole-board snapshot, (b) wipe the doctor/therapist/
+   room lists, or (c) revert a change someone else made on another device. */
+let histLast=null,lastAction=null,cloudReady=false;
 
 function freshState(){const occ={};SEED.groups.forEach(g=>g.rooms.forEach(r=>occ[r]=null));
   return {doctors:[...SEED.doctors],therapists:[...SEED.therapists],treatments:[...SEED.treatments],groups:JSON.parse(JSON.stringify(SEED.groups)),customers:{},occ,queue:[],completed:[],removed:[],seq:1,filterWindow:true};}
@@ -315,7 +332,9 @@ function migrate(s){if(!s)return null;if(!s.completed)s.completed=[];if(!s.remov
   Object.values(s.occ||{}).forEach(o=>{if(o){if(o.note===undefined)o.note="";if(o.nextRoom===undefined)o.nextRoom="";o.doctor=fixd(o.doctor);o.treatment=txArr(o.treatment);o.txDone=txArr(o.txDone);o.consult=!!o.consult;o.consultant=o.consultant||"";o.consultTs=o.consultTs||0;}});
   Object.values(s.customers||{}).forEach(c=>{if(c)c.doctor=fixd(c.doctor);});
   (s.completed||[]).forEach(c=>{c.doctor=fixd(c.doctor);c.treatment=txArr(c.treatment);});
-  (s.removed||[]).forEach(c=>{c.treatment=txArr(c.treatment);});return s;}
+  (s.removed||[]).forEach(c=>{c.treatment=txArr(c.treatment);});
+  // records predating the id field: give them one so undo can identify them
+  (s.completed||[]).concat(s.removed||[]).forEach(c=>{if(c&&c.id==null)c.id=nextId();});return s;}
 function load(){try{const s=localStorage.getItem(LS_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
 function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){}
   if(cloudRef&&!applyingRemote){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{cloudRef.set(JSON.stringify(state));}catch(e){}},250);}}
@@ -348,8 +367,13 @@ function tsToHM(ts){const d=new Date(ts);return pad(d.getHours())+":"+pad(d.getM
 function toast(m){const t=$("toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),1600);}
 function allRooms(){return state.groups.flatMap(g=>g.rooms);}
 function freeRooms(){return allRooms().filter(r=>!state.occ[r]);}
-function thOptions(sel){return ['<option value="">Therapist…</option>'].concat(state.therapists.map(d=>`<option ${d===sel?'selected':''}>${esc(d)}</option>`)).join('');}
-function docOptions(sel){return ['<option value="">Doctor…</option>'].concat(state.doctors.map(d=>`<option ${d===sel?'selected':''}>${esc(d)}</option>`)).join('');}
+// If the current name isn't in the list (e.g. the nightly CRM sync derives doctor
+// names independently of the counter-maintained lists, so spellings can differ),
+// carry it as an extra option — otherwise the box silently falls back to the
+// "Therapist…"/"Doctor…" placeholder with an empty value, hiding who's actually assigned.
+function withCurrent(list,sel){const a=list.slice();if(sel&&a.indexOf(sel)<0)a.unshift(sel);return a;}
+function thOptions(sel){return ['<option value="">Therapist…</option>'].concat(withCurrent(state.therapists,sel).map(d=>`<option ${d===sel?'selected':''}>${esc(d)}</option>`)).join('');}
+function docOptions(sel){return ['<option value="">Doctor…</option>'].concat(withCurrent(state.doctors,sel).map(d=>`<option ${d===sel?'selected':''}>${esc(d)}</option>`)).join('');}
 function parseTimeInput(s){s=(s||"").trim().toLowerCase();if(!s)return"";let pm=/p/.test(s),am=/a/.test(s);let h,mm;if(s.includes(":")){let p=s.replace(/[^0-9:]/g,'').split(":");h=parseInt(p[0]||"0",10);mm=parseInt(p[1]||"0",10);}else{let d=s.replace(/\D/g,'');if(!d)return"";if(d.length<=2){h=parseInt(d,10);mm=0;}else{mm=parseInt(d.slice(-2),10);h=parseInt(d.slice(0,-2),10);}}if(isNaN(h))return"";if(isNaN(mm))mm=0;if(am){if(h===12)h=0;}else if(pm){if(h<12)h+=12;}else if(h>=1&&h<=9)h+=12;if(h>23||mm>59)return"";return pad(h)+":"+pad(mm);}
 function hm12(hm){if(!hm)return"";let[h,m]=hm.split(":").map(Number);let ap=h>=12?'PM':'AM';let hh=h%12;if(hh===0)hh=12;return hh+":"+pad(m)+" "+ap;}
 function txDisp(t){return txArr(t).join(" + ");}
@@ -357,18 +381,34 @@ function txChips(t,prefix){return txArr(t).map((x,i)=>`<span class="txchip">${es
 function fillSel(id,html){const el=$(id);if(!el)return;const v=el.value;el.innerHTML=html;el.value=v;}
 function sendRoomOpts(label){return ['<option value="">'+label+'</option>'].concat(freeRooms().map(r=>`<option>${esc(r)}</option>`)).join('');}
 
+// Appointment = not here yet (Appointments list). Walk-in = standing at the
+// counter now (Waiting room). Same fields either way; the toggle picks which.
+function setAddMode(walk){addWalkIn=!!walk;try{localStorage.setItem(LS_ADDMODE,addWalkIn?"1":"0");}catch(e){}updateAddMode();}
+function updateAddMode(){
+  const a=$("addModeAppt"),w=$("addModeWalk"),b=$("arriveBtn");
+  if(a)a.classList.toggle("on",!addWalkIn);
+  if(w)w.classList.toggle("on",addWalkIn);
+  if(b)b.textContent=addWalkIn?"+ Add walk-in":"+ Add appointment";}
 function arrive(){const name=$("arriveName").value.trim();if(!name){toast("Type a name first");return;}
   const doc=$("arriveDoc").value;
   if(!state.customers[name])state.customers[name]={doctor:"",therapist:""};
   if(doc)state.customers[name].doctor=doc;
   const c=state.customers[name];
   const txs=$("arriveTx").value.split(",").map(s=>s.trim()).filter(Boolean);
-  state.queue.push({id:nextId(),customer:name,doctor:doc||c.doctor||"",therapist:c.therapist||"",treatment:txs,appt:parseTimeInput($("arriveTime").value),arrivedAt:""});
+  state.queue.push({id:nextId(),customer:name,doctor:doc||c.doctor||"",therapist:c.therapist||"",treatment:txs,appt:parseTimeInput($("arriveTime").value),arrivedAt:addWalkIn?nowHM():""});
   $("arriveName").value="";$("arriveTx").value="";$("arriveDoc").value="";$("arriveTime").value="";commit();}
 function setCustDoc(name,v){if(name){state.customers[name]=state.customers[name]||{doctor:"",therapist:""};state.customers[name].doctor=v;}}
 function qSetDoctor(id,v){const q=state.queue.find(x=>x.id==id);if(q){q.doctor=v;setCustDoc(q.customer,v);editingDocId=null;commit();}}
 function qSetAppt(id,v){const q=state.queue.find(x=>x.id==id);if(q){q.appt=v;editingTimeId=null;commit();}}
-function qSetThera(id,v){const q=state.queue.find(x=>x.id==id);if(q){q.therapist=v;commit();}}
+function qSetThera(id,v){const q=state.queue.find(x=>x.id==id);if(q){q.therapist=v;editingQTheraId=null;commit();}}
+// Waiting-room therapist field: a plain name + pencil once assigned (matching how the doctor
+// field already works), so the full-width select doesn't sit there taking up a whole row once
+// there's nothing left to pick.
+function editQThera(id){editingQTheraId=id;editingDocId=null;editingDocRoom=null;editingTimeId=null;editingTheraRoom=null;editingMaskRoom=null;render();}
+function theraInlineWaiting(id,therapist){
+  if(editingQTheraId===id||!therapist)
+    return `<select id="activeEdit" onblur="cancelEdit()" onchange="qSetThera(${id},this.value)" style="flex:1;min-width:0">${thOptions(therapist)}</select>`;
+  return `<span class="docline">${esc(therapist)}</span><button class="docedit" title="change therapist" onclick="editQThera(${id})">✎</button>`;}
 function qConsultSet(id,on){const q=state.queue.find(x=>x.id==id);if(!q)return;q.consult=on;if(!on){q.consultant="";}else{
   q.treatment=txArr(q.treatment);["Goldius Glam","Oxy"].forEach(t=>{if(!q.treatment.includes(t))q.treatment.push(t);});}
   commit();}
@@ -387,9 +427,9 @@ function qConsultDetail(q){
     (hasPL?'':`<button class="chip" style="padding:2px 7px;font-size:11px" title="add Pro Light" onclick="qTxAdd(${q.id},'Pro Light')">+ Pro Light</button>`)+
     `</div>`;}
 function toggleQ(id){expandedQ=(expandedQ==id)?null:id;render();}
-function editDoc(id){editingDocId=id;editingDocRoom=null;editingTimeId=null;editingTheraRoom=null;editingMaskRoom=null;render();}
-function editTime(id){editingTimeId=id;editingDocId=null;editingDocRoom=null;editingTheraRoom=null;editingMaskRoom=null;render();}
-function editTheraRoom(room){editingTheraRoom=room;editingDocId=null;editingDocRoom=null;editingTimeId=null;editingMaskRoom=null;render();}
+function editDoc(id){editingDocId=id;editingDocRoom=null;editingTimeId=null;editingTheraRoom=null;editingMaskRoom=null;editingQTheraId=null;render();}
+function editTime(id){editingTimeId=id;editingDocId=null;editingDocRoom=null;editingTheraRoom=null;editingMaskRoom=null;editingQTheraId=null;render();const el=$("activeEdit");if(el){el.focus();el.select&&el.select();}}
+function editTheraRoom(room){editingTheraRoom=room;editingDocId=null;editingDocRoom=null;editingTimeId=null;editingMaskRoom=null;editingQTheraId=null;render();}
 function maskBump(room,delta){const o=state.occ[room];if(!o||!o.mask)return;let m=(toMin(o.mask)+delta+1440)%1440;o.mask=pad(Math.floor(m/60))+":"+pad(m%60);commit();}
 function roomSetTherapist(room,v){const o=state.occ[room];if(o){o.therapist=v;editingTheraRoom=null;commit();}}
 function consultElapsed(o){if(!o.consultTs)return 0;return Math.max(0,Math.floor((Date.now()-o.consultTs)/60000));}
@@ -405,11 +445,11 @@ function consultBlock(room,o){if(!o.consult)return"";
       (o.consultant?`<span class="notetext" title="click to edit" onclick="consultToggle('${jsq(room)}')">${esc(o.consultant)}</span>`:`<button class="chip" onclick="consultToggle('${jsq(room)}')">+ consultant</button>`)}
       <button class="chip sel" title="treatment has commenced — end consult" onclick="consultEnd('${jsq(room)}')">✓ start treatment</button>
     </div></div>`;}
-function cancelEdit(){editingDocId=null;editingDocRoom=null;editingTimeId=null;editingTheraRoom=null;editingMaskRoom=null;editingConsultRoom=null;render();}
+function cancelEdit(){editingDocId=null;editingDocRoom=null;editingTimeId=null;editingTheraRoom=null;editingMaskRoom=null;editingConsultRoom=null;editingQTheraId=null;render();}
 function qTxAdd(id,v){v=v.trim();if(!v)return;const q=state.queue.find(x=>x.id==id);if(q){q.treatment=txArr(q.treatment);if(!q.treatment.includes(v))q.treatment.push(v);commit();}}
 function qTxRemove(id,i){const q=state.queue.find(x=>x.id==id);if(q){q.treatment=txArr(q.treatment);q.treatment.splice(i,1);commit();}}
 function qCheckIn(id){const q=state.queue.find(x=>x.id==id);if(q){q.arrivedAt=q.arrivedAt?"":nowHM();commit();}}
-function removeQueue(id){const q=state.queue.find(x=>x.id==id);if(q){state.removed.push({customer:q.customer,doctor:q.doctor,treatment:txArr(q.treatment),appt:q.appt,at:nowHM()});}
+function removeQueue(id){const q=state.queue.find(x=>x.id==id);if(q){state.removed.push({id:nextId(),customer:q.customer,doctor:q.doctor,treatment:txArr(q.treatment),appt:q.appt,at:nowHM()});}
   state.queue=state.queue.filter(x=>x.id!=id);commit();}
 function moveQueueToRoom(id,room){if(!room)return;const i=state.queue.findIndex(x=>x.id==id);if(i<0)return;
   if(state.occ[room]){toast(room+" is occupied");render();return;}const rv=nextFor(room);if(rv){toast(room+" is reserved for "+rv.customer);render();return;}const q=state.queue[i];
@@ -417,8 +457,21 @@ function moveQueueToRoom(id,room){if(!room)return;const i=state.queue.findIndex(
     consult:!!q.consult,consultant:q.consultant||"",consultTs:q.consult?Date.now():0};
   state.queue.splice(i,1);commit();}
 function roomSet(room,f,v){if(state.occ[room]){state.occ[room][f]=v;commit();}}
+/* Note field, same shape as the v2 boards: a quiet "+ note" link until there is
+   something to say, a tappable chip once there is, and an input only while it is
+   actually being edited — instead of an always-open box on every room. */
+let editingNoteRoom=null;
+function noteToggle(room){editingNoteRoom=editingNoteRoom===room?null:room;render();
+  const el=$("activeNote");if(el){el.focus();el.select&&el.select();}}
+function noteSave(room,v){const o=state.occ[room];if(!o)return;o.note=v;editingNoteRoom=null;commit();}
+function noteRow(room,o){
+  if(editingNoteRoom===room)
+    return `<div class="fieldrow"><label>Note</label><input id="activeNote" class="note-in" value="${esc(o.note||'')}" placeholder="remark…" onkeydown="if(event.key==='Enter')this.blur()" onblur="noteSave('${jsq(room)}',this.value)"></div>`;
+  if(o.note)
+    return `<div class="fieldrow"><label>Note</label><div style="flex:1;padding-top:5px"><span class="notetext" title="click to edit" onclick="noteToggle('${jsq(room)}')">\ud83d\udcdd ${esc(o.note)}</span></div></div>`;
+  return `<div class="fieldrow"><label></label><div style="flex:1"><button class="notelink" onclick="noteToggle('${jsq(room)}')">\uff0b note</button></div></div>`;}
 function roomSetDoctor(room,v){const o=state.occ[room];if(o){o.doctor=v;setCustDoc(o.customer,v);editingDocRoom=null;commit();}}
-function editDocRoom(room){editingDocRoom=room;editingDocId=null;editingTimeId=null;editingMaskRoom=null;render();}
+function editDocRoom(room){editingDocRoom=room;editingDocId=null;editingTimeId=null;editingMaskRoom=null;editingQTheraId=null;render();}
 function roomTxAdd(room,v){v=v.trim();if(!v)return;const o=state.occ[room];if(o){o.treatment=txArr(o.treatment);if(!o.treatment.includes(v))o.treatment.push(v);commit();}}
 function roomTxRemove(room,i){const o=state.occ[room];if(o){o.treatment=txArr(o.treatment);o.treatment.splice(i,1);commit();}}
 function roomTxDone(room,i){const o=state.occ[room];if(!o)return;o.treatment=txArr(o.treatment);o.txDone=txArr(o.txDone);const x=o.treatment.splice(i,1)[0];if(x)o.txDone.push(x);commit();}
@@ -432,19 +485,55 @@ function moveRoomToRoom(from,to){if(!to)return;if(state.occ[to]){toast(to+" is o
   state.occ[from]=null;commit();}
 function roomToQueue(room){const o=state.occ[room];if(!o)return;state.queue.push({id:nextId(),customer:o.customer,doctor:o.doctor,therapist:o.therapist,treatment:txArr(o.treatment),appt:o.appt||"",arrivedAt:nowHM()});state.occ[room]=null;commit();}
 function clearRoom(room){const o=state.occ[room];if(o&&!o.therapist){toast("Assign a therapist before clearing the room");return;}if(o&&!confirm("Clear "+room+" and free it?"))return;
-  if(o)state.completed.push({customer:o.customer,doctor:o.doctor,therapist:o.therapist,treatment:txArr(o.txDone).concat(txArr(o.treatment)),room,at:nowHM()});
+  if(o)state.completed.push({id:nextId(),customer:o.customer,doctor:o.doctor,therapist:o.therapist,treatment:txArr(o.txDone).concat(txArr(o.treatment)),room,at:nowHM()});
   state.occ[room]=null;commit();}
 function assignFreeRoom(room,id){if(id)moveQueueToRoom(parseInt(id,10),room);}
 function toggleFilter(v){state.filterWindow=v;commit();}
-function clearRooms(){if(!confirm("Move everyone out of rooms and back to appointments? Rooms become free and each customer returns to the appointments list — nobody is deleted. Appointments and today's records are kept."))return;
+function clearRooms(){if(!confirm("Move everyone out of rooms AND out of the waiting room, back to the appointments list? Rooms become free and nobody is deleted. Today's records are kept."))return;
   autoBackup();
+  // The waiting room is "checked in today" — a reset has to clear that too, or
+  // yesterday's arrivals stay marked as standing at the counter.
+  let w=0;state.queue.forEach(q=>{if(q.arrivedAt){q.arrivedAt="";w++;}});
   let n=0;allRooms().forEach(r=>{const o=state.occ[r];if(!o)return;n++;
-    state.queue.push({id:nextId(),customer:o.customer,doctor:o.doctor,therapist:o.therapist,treatment:txArr(o.treatment),appt:o.appt||"",arrivedAt:nowHM()});
+    // arrivedAt stays EMPTY so they land in Appointments, as this dialog says.
+    // The per-room send-back still marks them arrived — there the person really
+    // is in the clinic waiting.
+    state.queue.push({id:nextId(),customer:o.customer,doctor:o.doctor,therapist:o.therapist,treatment:txArr(o.treatment),appt:o.appt||"",arrivedAt:""});
     state.occ[r]=null;});
-  commit();toast(n?("Cleared "+n+" room"+(n===1?"":"s")):"No rooms were occupied");}
-function updateUndoBtn(){const b=$("undoBtn");if(!b)return;const n=undoStack.length;b.disabled=!n;b.textContent="↶ Undo"+(n?" ("+n+")":"");}
+  commit();toast((n||w)?("Cleared "+n+" room"+(n===1?"":"s")+(w?" and "+w+" from the waiting room":"")):"Nothing to clear");}
+function updateUndoBtn(){const b=$("undoBtn");if(!b)return;
+  b.disabled=!lastAction;b.textContent="↶ Undo";
+  b.title=lastAction?("Undo: "+lastAction.label):"Nothing of yours to undo yet";}
+// Which room/queue/record entries differ, and what they held BEFORE. Lists are
+// deliberately not diffed — no ordinary action touches them, so an undo must
+// never put an old copy of them back.
+function diffEntries(before,after){
+  const d={occ:{},queue:{},completed:{},removed:{}},J=x=>JSON.stringify(x||null);
+  new Set([...Object.keys(before.occ||{}),...Object.keys(after.occ||{})]).forEach(r=>{
+    if(J((before.occ||{})[r])!==J((after.occ||{})[r]))d.occ[r]=(before.occ||{})[r]||null;});
+  const byId=a=>{const m={};(a||[]).forEach(x=>{if(x&&x.id!=null)m[x.id]=x;});return m;};
+  ['queue','completed','removed'].forEach(k=>{const B=byId(before[k]),A=byId(after[k]);
+    new Set([...Object.keys(B),...Object.keys(A)]).forEach(id=>{
+      if(J(B[id])!==J(A[id]))d[k][id]=B[id]||null;});});
+  return d;}
+// Put those specific entries back onto the CURRENT state, leaving everything
+// else — other rooms, the lists, other people's edits — exactly as it is.
+function applyEntries(d){const C=x=>JSON.parse(JSON.stringify(x));
+  Object.keys(d.occ||{}).forEach(r=>{state.occ[r]=d.occ[r]?C(d.occ[r]):null;});
+  ['queue','completed','removed'].forEach(k=>{const cur=state[k]||[];
+    Object.keys(d[k]||{}).forEach(id=>{const want=d[k][id],i=cur.findIndex(x=>String(x.id)===String(id));
+      if(want==null){if(i>-1)cur.splice(i,1);}
+      else if(i>-1)cur[i]=C(want);else cur.push(C(want));});
+    state[k]=cur;});}
 function recordHistory(){const cur=JSON.stringify(state);if(cur===histLast)return;
-  if(histLast!=null){undoStack.push(histLast);while(undoStack.length>UNDO_MAX)undoStack.shift();}
+  // Only this device's OWN actions arm undo, and only once the cloud has sent us
+  // a real board — otherwise a device acting before its first sync could push a
+  // stale (or seed) state back over everyone.
+  if(histLast!=null&&!applyingRemote&&(cloudReady||!cloudRef)){
+    try{const prev=JSON.parse(histLast);
+      lastAction={before:diffEntries(prev,state),label:describeUndo(prev,state)};}
+    catch(e){lastAction=null;}
+  }
   histLast=cur;updateUndoBtn();}
 // Compares the snapshot we're restoring TO (restoring) against the state we're
 // leaving behind (leaving) and names the most likely single thing the undone
@@ -498,11 +587,10 @@ function describeUndo(restoring,leaving){
     return "Undid last change";
   }catch(e){return "Undid last change";}
 }
-function undo(){if(!undoStack.length){toast("Nothing to undo");return;}
-  const prev=undoStack.pop();let st;try{st=migrate(JSON.parse(prev));}catch(e){toast("Could not undo");return;}
-  const desc=describeUndo(st,state);
-  state=st;
-  histLast=JSON.stringify(state);save();render();updateUndoBtn();toast(desc);}
+function undo(){if(!lastAction){toast("Nothing to undo");return;}
+  const a=lastAction;lastAction=null;
+  try{applyEntries(a.before);}catch(e){toast("Could not undo");updateUndoBtn();return;}
+  histLast=JSON.stringify(state);save();render();updateUndoBtn();toast("Undone — "+a.label);}
 function toggleMenu(e){e.stopPropagation();const m=$("moreMenu");if(m)m.classList.toggle("show");}
 function closeMenu(){const m=$("moreMenu");if(m)m.classList.remove("show");}
 function commit(){save();recordHistory();render();}
@@ -520,6 +608,12 @@ function render(){
   let html="";state.groups.forEach(g=>{html+=`<div class="group-title">${esc(g.name)}</div><div class="rooms-grid">`+g.rooms.map(roomCard).join('')+`</div>`;});
   $("roomsHost").innerHTML=html;
   renderThera();renderWaiting();renderQueue();
+  // Deliberately focus() ONLY — no showPicker(). Auto-opening the native picker
+  // here broke the room doctor/therapist pencils in Safari (the picker opened and
+  // was immediately dismissed, firing the select's onblur -> cancelEdit(), so the
+  // field reverted and the pencil looked dead). Two taps to open a dropdown is the
+  // long-standing v1 behaviour and is fine; don't "improve" it again without
+  // testing in Safari specifically, not just a Chromium-based browser.
   const ae=$("activeEdit");if(ae)ae.focus();
 }
 function roomCard(room){
@@ -544,7 +638,7 @@ function roomCard(room){
       <div class="fieldrow"><label>Tx</label><div class="txwrap">${remChips}<input class="txin" list="txList" placeholder="+ add" onchange="roomTxAdd('${jsq(room)}',this.value);this.value=''"></div></div>
       ${doneChips?`<div class="fieldrow"><label>Done</label><div class="txwrap">${doneChips}</div></div>`:''}
       ${o.consult?'':(o.mask?`<div class="fieldrow"><label>Mask off</label><div style="flex:1;padding-top:6px"><b>${esc(hm12(o.mask))}</b><span class="mstep"><button title="+1 min" onclick="maskBump('${jsq(room)}',1)">▲</button><button title="-1 min" onclick="maskBump('${jsq(room)}',-1)">▼</button></span>${maskRel(o.mask)} <button class="maskx" title="clear mask-off time" onclick="maskClear('${jsq(room)}')">✕</button></div></div>`:`<div class="fieldrow maskrow"><label style="width:auto">Mask</label><span class="hint">on for:</span><button class="chip" onclick="maskIn('${jsq(room)}',5)">5m</button><button class="chip" onclick="maskIn('${jsq(room)}',10)">10m</button><button class="chip" onclick="maskIn('${jsq(room)}',15)">15m</button><span class="maskbreak"></span><span class="mhidden">Mask</span><span class="hint mhidden">on for:</span><input class="timein" title="exact time" placeholder="e.g. 345" onchange="roomSet('${jsq(room)}','mask',parseTimeInput(this.value))"></div>`)}
-      <div class="fieldrow"><label>Note</label><input class="note-in" value="${esc(o.note||'')}" placeholder="remark for this room…" onchange="roomSet('${jsq(room)}','note',this.value)"></div>
+      ${noteRow(room,o)}
       <div class="fieldrow"><label>Next →</label><select class="selCompact" onchange="roomSetNext('${jsq(room)}',this.value)">${nextOpts}</select></div>
       <div class="actions">${goBtn}
         <button class="btn sm red" onclick="clearRoom('${jsq(room)}')">Clear Room</button>
@@ -568,7 +662,8 @@ function renderWaiting(){
   if(!w.length){html+=`<div class="hint">No one checked in. Tap “✓ Arrived” on an appointment.</div>`;}
   w.forEach(({q,wait})=>{const cls=wait>=40?'wlong':wait>=20?'wmed':'';
     html+=`<div class="witem ${cls}"><div class="wtop"><b>${esc(q.customer)}</b><span class="wmin">${wait}m</span></div>
-      <div class="qmeta" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted)">${docInline(q.id,q.doctor)}${q.appt?' · '+esc(hm12(q.appt)):''}<span style="flex:1"></span>${qConsultBadge(q)}<select style="width:96px;flex:none" onchange="qSetThera(${q.id},this.value)">${thOptions(q.therapist)}</select></div>
+      <div class="qmeta" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);min-width:0">${docInline(q.id,q.doctor)}${q.appt?' · '+esc(hm12(q.appt)):''}</div>
+      <div class="qmeta" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:3px">${qConsultBadge(q)}${theraInlineWaiting(q.id,q.therapist)}</div>
       ${qConsultDetail(q)}
       <div class="txwrap">${txChips(q.treatment,`qTxRemove(${q.id},`)}<input class="txin" list="txList" placeholder="+ tx" onchange="qTxAdd(${q.id},this.value);this.value=''"></div>
       <div style="display:flex;gap:6px;align-items:center"><select onchange="moveQueueToRoom(${q.id},this.value)" style="flex:1">${sendRoomOpts('→ room ▾')}</select><button class="btn sm grey" title="Clicked Arrived by mistake — send back to appointments" onclick="qCheckIn(${q.id})">↩ appts</button><button class="btn sm grey" title="Remove customer (logged in Records)" onclick="removeQueue(${q.id})">✕</button></div></div>`;});
@@ -636,10 +731,26 @@ function openSettings(){const dn=state.groups.find(g=>g.name==="Downstairs")||st
   $("settingsModal").classList.add("show");}
 function saveSettings(){const lines=t=>t.value.split("\n").map(x=>x.trim()).filter(Boolean);
   const newGroups=[{name:"Downstairs",rooms:lines($("setDown"))},{name:"Upstairs",rooms:lines($("setUp"))}];
-  state.doctors=lines($("setDoctors"));state.therapists=lines($("setTherapists"));state.treatments=lines($("setTreatments"));
-  const newRooms=newGroups.flatMap(g=>g.rooms);const occ={};newRooms.forEach(r=>occ[r]=state.occ[r]||null);
+  const newDoctors=lines($("setDoctors")),newTherapists=lines($("setTherapists")),newTreatments=lines($("setTreatments"));
+  const newRooms=newGroups.flatMap(g=>g.rooms);
+  // Never let a populated list be saved as empty. A blank box here nearly always
+  // means the page hadn't finished loading from the cloud, or a field was cleared
+  // by accident — and saving it would blank that list on every device at once.
+  const emptied=[];
+  if(!newDoctors.length&&state.doctors.length)emptied.push("Doctors");
+  if(!newTherapists.length&&state.therapists.length)emptied.push("Therapists");
+  if(!newTreatments.length&&state.treatments.length)emptied.push("Treatments");
+  if(!newRooms.length&&allRooms().length)emptied.push("Rooms");
+  if(emptied.length){toast(emptied.join(" / ")+" can't be saved empty — nothing was changed");return;}
+  // Losing most of a list in one save is likelier to be a mistake than an edit.
+  const shrink=[];
+  const bigCut=(before,after,label)=>{if(before.length>=4&&after.length<Math.ceil(before.length/2))shrink.push(label+": "+before.length+" \u2192 "+after.length);};
+  bigCut(state.doctors,newDoctors,"Doctors");bigCut(state.therapists,newTherapists,"Therapists");bigCut(allRooms(),newRooms,"Rooms");
+  if(shrink.length&&!confirm("This removes a lot at once:\n\n  "+shrink.join("\n  ")+"\n\nSave anyway?"))return;
+  state.doctors=newDoctors;state.therapists=newTherapists;state.treatments=newTreatments;
+  const occ={};newRooms.forEach(r=>occ[r]=state.occ[r]||null);
   allRooms().forEach(r=>{if(!newRooms.includes(r)&&state.occ[r]){const o=state.occ[r];state.queue.push({id:nextId(),customer:o.customer,doctor:o.doctor,therapist:o.therapist,treatment:txArr(o.treatment),appt:o.appt||"",arrivedAt:nowHM()});}});
-  state.groups=newGroups;state.occ=occ;closeModal('settingsModal');commit();toast("Lists saved");}
+  state.groups=newGroups;state.occ=occ;closeModal('settingsModal');commit();lastAction=null;updateUndoBtn();toast("Lists saved");}
 function closeModal(id){$(id).classList.remove("show");}
 
 function importState(ev){const f=ev.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{try{
@@ -667,7 +778,7 @@ function importState(ev){const f=ev.target.files[0];if(!f)return;const r=new Fil
 function setSync(t,cls){const e=$("syncst");if(e){e.textContent=t;e.className="syncst"+(cls?" "+cls:"");e.style.display=cls==='cloud'?'none':'';}}
 function connectCloud(){
   if(cloudRef)return;const db=firebase.database();cloudRef=db.ref(FIREBASE_PATH);
-  cloudRef.on('value',snap=>{const v=snap.val();if(typeof v==='string'){try{applyingRemote=true;state=migrate(JSON.parse(v));try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){}recordHistory();render();}catch(e){}applyingRemote=false;}});
+  cloudRef.on('value',snap=>{const v=snap.val();if(typeof v==='string'){try{applyingRemote=true;cloudReady=true;state=migrate(JSON.parse(v));try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){}recordHistory();render();}catch(e){}applyingRemote=false;}});
   cloudRef.once('value').then(s=>{if(s.val()==null){try{cloudRef.set(JSON.stringify(state));}catch(e){}}});
 }
 function doLogin(){let u=$("loginEmail").value.trim();const p=$("loginPwd").value;if(!u||!p){$("loginErr").textContent="Enter username and password.";return;}
@@ -689,7 +800,7 @@ function initCloud(){
 function tick(){$("clock").textContent=nowHM();if(!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))render();}
 $("arriveName").addEventListener("keydown",e=>{if(e.key==="Enter")arrive();});
 document.addEventListener("click",e=>{const m=$("moreMenu");if(m&&m.classList.contains("show")&&!e.target.closest(".menu-wrap"))m.classList.remove("show");});
-render();$("clock").textContent=nowHM();histLast=JSON.stringify(state);updateUndoBtn();
+updateAddMode();render();$("clock").textContent=nowHM();histLast=JSON.stringify(state);updateUndoBtn();
 if(FIREBASE_CONFIG&&window.firebase){$("loginOverlay").classList.add("show");}
 initCloud();
 setInterval(()=>{$("clock").textContent=nowHM();},1000);
