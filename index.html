@@ -341,10 +341,11 @@ function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e)
 function nextId(){return state.seq++;}
 
 /* ===== Auto-backup: rolling local snapshots so data survives a Firebase drop or accidental reset ===== */
-const BK_KEY="roomFlowBoard_v4_backups",BK_MAX=18;
+const BK_KEY=LS_KEY+"_backups",BK_MAX=18; // per-board: all boards share one origin, so a fixed key cross-contaminated them
+const BK_BOARD=LS_KEY; // stamped into every snapshot so it can never be restored onto another board
 function loadBackups(){try{const a=JSON.parse(localStorage.getItem(BK_KEY)||"[]");return Array.isArray(a)?a:[];}catch(e){return [];}}
 function autoBackup(){try{const json=JSON.stringify(state);const arr=loadBackups();const last=arr[arr.length-1];
-  if(last&&last.json===json)last.t=Date.now();else arr.push({t:Date.now(),json});
+  if(last&&last.json===json)last.t=Date.now();else arr.push({t:Date.now(),json,board:BK_BOARD});
   while(arr.length>BK_MAX)arr.shift();localStorage.setItem(BK_KEY,JSON.stringify(arr));}catch(e){}}
 function bkTime(t){const d=new Date(t);return pad(d.getHours())+":"+pad(d.getMinutes())+" ("+(d.getMonth()+1)+"/"+d.getDate()+")";}
 function openBackups(){const arr=loadBackups().slice().reverse();
@@ -353,6 +354,9 @@ function openBackups(){const arr=loadBackups().slice().reverse();
     html+=`<div class="rec-item">🗂 ${esc(bkTime(b.t))} · ${rooms} in use · ${q} in queue/appts <button class="btn sm" style="margin-left:6px" onclick="restoreBackup(${b.t})">Restore</button></div>`;});
   $("backupBody").innerHTML=html;$("backupModal").classList.add("show");}
 function restoreBackup(t){const b=loadBackups().find(x=>x.t===t);if(!b)return;
+  // Belt and braces: even if a foreign snapshot somehow reaches this list, never
+  // let it overwrite this board. An unstamped one predates the per-board key.
+  if(b.board&&b.board!==BK_BOARD){toast("That snapshot belongs to another board — not restored");return;}
   if(!confirm("Restore the board to the snapshot from "+bkTime(t)+"?\nThis replaces the current board"+(cloudRef?" on ALL connected devices":"")+"."))return;
   try{autoBackup();state=migrate(JSON.parse(b.json));commit();closeModal('backupModal');toast("Backup restored");}catch(e){toast("Could not restore backup");}}
 
