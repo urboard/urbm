@@ -17,6 +17,43 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="BM Flow Board">
 <!-- Firebase (only used if FIREBASE_CONFIG is filled in below) -->
+<script>
+/* Boot watchdog: if the main script below ever throws before it finishes, say so
+   instead of leaving a silent blank board that looks like lost data.
+   The badge is TAPPABLE on purpose -- a title tooltip does not exist on an iPad
+   or a phone, and the whole point is that staff can read the real cause and
+   send it on rather than just reporting "the board is empty". */
+window.__rfErr=null;window.__rfShown=false;
+function __rfShowFailure(){
+  /* The badge lives in <body>, this script runs in <head>. An error thrown inside
+     one of the Firebase scripts below therefore arrives BEFORE the badge exists.
+     Remember the message and try again once the document is parsed -- latching on
+     the first error without showing it would swallow the real app failure and
+     leave exactly the silent blank board this watchdog exists to prevent. */
+  if(window.__rfShown||!window.__rfErr)return false;
+  var b=document.getElementById("syncst");
+  if(!b)return false;
+  b.textContent="app failed to start - tap";
+  b.className="syncst err";
+  b.title=window.__rfErr;
+  b.style.cursor="pointer";
+  b.onclick=function(){alert(
+    "This board could not start on THIS device.\n\n"+window.__rfErr+
+    "\n\nNothing is lost - the appointments live in the cloud, not on this device."+
+    "\n\n1. Reload the page."+
+    "\n2. Still failing? Check another phone or laptop."+
+    "\n   - others work  -> this device's browser settings"+
+    "\n   - all broken   -> the last upload; roll it back"+
+    "\n\nScreenshot this message and send it.");};
+  window.__rfShown=true;return true;
+}
+window.addEventListener("error",function(ev){
+  if(window.__rfBooted)return;
+  if(!window.__rfErr)window.__rfErr=(ev&&ev.message)||"unknown error";  // keep the FIRST, it is the cause
+  __rfShowFailure();
+});
+document.addEventListener("DOMContentLoaded",function(){if(!window.__rfBooted)__rfShowFailure();});
+</script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
@@ -274,6 +311,26 @@
 
 <script>
 "use strict";
+/* ===== Safe storage =====
+   Some devices refuse site data (Chrome "Don't allow sites to save data", a
+   privacy extension, Safari private mode, a locked-down MDM profile). On those
+   devices touching localStorage THROWS, and because the very first thing this
+   script did was read it, the whole script died and the board rendered as a
+   dead HTML shell: frozen clock, no rooms, no login box. All six boards live
+   on one origin, so one blocked setting killed every board on that device.
+   Fall back to an in-memory store instead: the board still runs off the cloud,
+   it just forgets per-device preferences when the tab closes. */
+const LS=(function(){
+  try{const t="__rf_probe";localStorage.setItem(t,"1");localStorage.removeItem(t);return localStorage;}
+  catch(e){
+    const mem=Object.create(null);
+    try{console.warn("Site data is blocked in this browser - running without local storage.",e);}catch(_){}
+    return {getItem:k=>(k in mem?mem[k]:null),
+            setItem:(k,v)=>{mem[k]=String(v);},
+            removeItem:k=>{delete mem[k];},
+            blocked:true};
+  }
+})();
 /* ===== Cloud sync (optional) — paste your Firebase config to enable sharing across devices =====
    Leave as null for single-device (browser-local) use. See README. */
 const FIREBASE_CONFIG={
@@ -291,7 +348,7 @@ const LOGIN_DOMAIN="urbm.local"; // staff type a username; app appends this to m
 
 const LS_KEY="roomFlowBoard_urbm_v4";
 const LS_ADDMODE="urbm_v4_addWalkIn";
-let addWalkIn=localStorage.getItem(LS_ADDMODE)==="1"; // Appointment vs Walk-in, remembered per device
+let addWalkIn=LS.getItem(LS_ADDMODE)==="1"; // Appointment vs Walk-in, remembered per device
 const SEED_TX=["Goldius Glam","Alex","Pro Light","P7","Revive","E2","EXO-T","S Plus (Face)","S Plus (Neck)","HIFU (Face)","HIFU (Neck)","Oxy","SRW","Soft Laser","Radiesse","Filler","Botox","dePigmentation","Revital"];
 const SEED={
   doctors:["Dr Cheryl","Dr Nicole","Dr Teh","Dr Chan","Dr Yi Wen","Dr Michelle","Dr Eunice"],
@@ -300,7 +357,8 @@ const SEED={
   groups:[{name:"Downstairs",rooms:["Con 1","Con 2","Room 1 (Alex)","Room 2 (Andy)"]},{name:"Upstairs",rooms:["R1","R2","R3","R4","Classroom","R5","R6","R7"]}],
   customers:{}
 };
-let state=migrate(load())||freshState();
+/* A cached board that migrate() chokes on must not kill the page either -- drop it and let the cloud repopulate. */
+let state=(function(){try{return migrate(load())||freshState();}catch(e){try{console.error("Saved board was unreadable, starting fresh.",e);LS.removeItem(LS_KEY);}catch(_){}return freshState();}})();
 let editingDocId=null,editingDocRoom=null,editingTimeId=null,editingTheraRoom=null,editingMaskRoom=null,editingConsultRoom=null,editingQTheraId=null;
 let expandedQ=null;
 let cloudRef=null,applyingRemote=false,saveTimer=null;
@@ -316,13 +374,25 @@ let histLast=null,lastAction=null,cloudReady=false;
 function freshState(){const occ={};SEED.groups.forEach(g=>g.rooms.forEach(r=>occ[r]=null));
   return {doctors:[...SEED.doctors],therapists:[...SEED.therapists],treatments:[...SEED.treatments],groups:JSON.parse(JSON.stringify(SEED.groups)),customers:{},occ,queue:[],completed:[],removed:[],seq:1,filterWindow:true};}
 function txArr(t){return Array.isArray(t)?t.slice():(t?[t]:[]);}
-function migrate(s){if(!s)return null;if(!s.completed)s.completed=[];if(!s.removed)s.removed=[];if(!s.treatments||!s.treatments.length)s.treatments=[...SEED.treatments];if(s.filterWindow===undefined)s.filterWindow=true;
-  if(!s.doctors||!s.doctors.length)s.doctors=[...SEED.doctors];
-  if(!s.therapists||!s.therapists.length)s.therapists=[...SEED.therapists];
-  if(!s.groups||!s.groups.length)s.groups=JSON.parse(JSON.stringify(SEED.groups));
+function migrate(s){if(!s)return null;if(!Array.isArray(s.completed))s.completed=[];if(!Array.isArray(s.removed))s.removed=[];if(!Array.isArray(s.treatments)||!s.treatments.length)s.treatments=[...SEED.treatments];if(s.filterWindow===undefined)s.filterWindow=true;
+  if(!Array.isArray(s.doctors)||!s.doctors.length)s.doctors=[...SEED.doctors];
+  if(!Array.isArray(s.therapists)||!s.therapists.length)s.therapists=[...SEED.therapists];
+  if(!Array.isArray(s.groups)||!s.groups.length)s.groups=JSON.parse(JSON.stringify(SEED.groups));
+  /* Every list below is walked with .forEach/.filter further down. These guards
+     used to test TRUTHINESS, so a saved board where one of them was an object
+     rather than an array sailed through and then threw -- killing the whole
+     script and leaving a dead page on that one device, for that one board.
+     Test the TYPE, and repair a malformed group instead of trusting it. */
+  s.groups=s.groups.filter(g=>g&&typeof g==='object')
+    .map(g=>Object.assign({},g,{name:g.name||"",rooms:(Array.isArray(g.rooms)?g.rooms:[]).filter(r=>typeof r==='string'&&r)}));
+  if(!s.groups.length)s.groups=JSON.parse(JSON.stringify(SEED.groups));
   if(!s.customers||typeof s.customers!=='object')s.customers={};
   if(!Array.isArray(s.queue))s.queue=[];
   if(!s.occ||typeof s.occ!=='object')s.occ={};
+  /* A room must hold an object or nothing. Anything else (a bare name saved by
+     some older path) hits a property assignment below and, under "use strict",
+     throws -- which took the whole board down. */
+  Object.keys(s.occ).forEach(r=>{const o=s.occ[r];if(o!==null&&(typeof o!=='object'||Array.isArray(o)))s.occ[r]=null;});
   s.groups.forEach(g=>g.rooms.forEach(r=>{if(!(r in s.occ))s.occ[r]=null;}));
   if(!s.seq)s.seq=s.queue.reduce((m,q)=>Math.max(m,q.id||0),0)+1;
   const __rooms=s.groups.flatMap(g=>g.rooms);Object.keys(s.occ).forEach(r=>{const o=s.occ[r];if(o&&!__rooms.includes(r)){s.queue.push({id:s.seq++,customer:o.customer,doctor:o.doctor||"",therapist:o.therapist||"",treatment:txArr(o.treatment),appt:o.appt||"",arrivedAt:nowHM()});delete s.occ[r];}});
@@ -333,20 +403,33 @@ function migrate(s){if(!s)return null;if(!s.completed)s.completed=[];if(!s.remov
   Object.values(s.customers||{}).forEach(c=>{if(c)c.doctor=fixd(c.doctor);});
   (s.completed||[]).forEach(c=>{c.doctor=fixd(c.doctor);c.treatment=txArr(c.treatment);});
   (s.removed||[]).forEach(c=>{c.treatment=txArr(c.treatment);});
-  // records predating the id field: give them one so undo can identify them
-  (s.completed||[]).concat(s.removed||[]).forEach(c=>{if(c&&c.id==null)c.id=nextId();});return s;}
-function load(){try{const s=localStorage.getItem(LS_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
-function save(){try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){}
-  if(cloudRef&&!applyingRemote){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{cloudRef.set(JSON.stringify(state));}catch(e){}},250);}}
+  /* Records predating the id field: give them one so undo can identify them.
+     Take the number straight off the board being migrated (s.seq++), NOT via
+     nextId(). nextId() reads the module-level `state`, and the boot path is
+     `let state=migrate(load())||freshState();` -- so during that call `state`
+     is still in its temporal dead zone and touching it throws
+     "Cannot access 'state' before initialization", killing the whole script
+     before the page draws anything. Any saved board holding one id-less
+     record was enough to make that device show a dead page for this board,
+     every time, while every other board on the same device opened fine. */
+  (s.completed||[]).concat(s.removed||[]).forEach(c=>{if(c&&c.id==null)c.id=s.seq++;});return s;}
+function load(){try{const s=LS.getItem(LS_KEY);return s?JSON.parse(s):null;}catch(e){return null;}}
+function save(){try{LS.setItem(LS_KEY,JSON.stringify(state));}catch(e){}
+  /* Never push before the first cloud snapshot has landed. v1 keeps the WHOLE
+     board in one blob, so any write is a full overwrite for every device -- and a
+     device that fell back to freshState() would publish the SEED lists over the
+     live board (the round-17 incident). recordHistory() already refuses to arm
+     undo before cloudReady for this exact reason; the cloud write needs it too. */
+  if(cloudRef&&!applyingRemote&&cloudReady){clearTimeout(saveTimer);saveTimer=setTimeout(()=>{try{cloudRef.set(JSON.stringify(state));}catch(e){}},250);}}
 function nextId(){return state.seq++;}
 
 /* ===== Auto-backup: rolling local snapshots so data survives a Firebase drop or accidental reset ===== */
 const BK_KEY=LS_KEY+"_backups",BK_MAX=18; // per-board: all boards share one origin, so a fixed key cross-contaminated them
 const BK_BOARD=LS_KEY; // stamped into every snapshot so it can never be restored onto another board
-function loadBackups(){try{const a=JSON.parse(localStorage.getItem(BK_KEY)||"[]");return Array.isArray(a)?a:[];}catch(e){return [];}}
+function loadBackups(){try{const a=JSON.parse(LS.getItem(BK_KEY)||"[]");return Array.isArray(a)?a:[];}catch(e){return [];}}
 function autoBackup(){try{const json=JSON.stringify(state);const arr=loadBackups();const last=arr[arr.length-1];
   if(last&&last.json===json)last.t=Date.now();else arr.push({t:Date.now(),json,board:BK_BOARD});
-  while(arr.length>BK_MAX)arr.shift();localStorage.setItem(BK_KEY,JSON.stringify(arr));}catch(e){}}
+  while(arr.length>BK_MAX)arr.shift();LS.setItem(BK_KEY,JSON.stringify(arr));}catch(e){}}
 function bkTime(t){const d=new Date(t);return pad(d.getHours())+":"+pad(d.getMinutes())+" ("+(d.getMonth()+1)+"/"+d.getDate()+")";}
 function openBackups(){const arr=loadBackups().slice().reverse();
   let html=arr.length?'':'<div class="hint">No backups yet. The board saves a local snapshot automatically every 10 minutes.</div>';
@@ -387,7 +470,7 @@ function sendRoomOpts(label){return ['<option value="">'+label+'</option>'].conc
 
 // Appointment = not here yet (Appointments list). Walk-in = standing at the
 // counter now (Waiting room). Same fields either way; the toggle picks which.
-function setAddMode(walk){addWalkIn=!!walk;try{localStorage.setItem(LS_ADDMODE,addWalkIn?"1":"0");}catch(e){}updateAddMode();}
+function setAddMode(walk){addWalkIn=!!walk;try{LS.setItem(LS_ADDMODE,addWalkIn?"1":"0");}catch(e){}updateAddMode();}
 function updateAddMode(){
   const a=$("addModeAppt"),w=$("addModeWalk"),b=$("arriveBtn");
   if(a)a.classList.toggle("on",!addWalkIn);
@@ -782,7 +865,32 @@ function importState(ev){const f=ev.target.files[0];if(!f)return;const r=new Fil
 function setSync(t,cls){const e=$("syncst");if(e){e.textContent=t;e.className="syncst"+(cls?" "+cls:"");e.style.display=cls==='cloud'?'none':'';}}
 function connectCloud(){
   if(cloudRef)return;const db=firebase.database();cloudRef=db.ref(FIREBASE_PATH);
-  cloudRef.on('value',snap=>{const v=snap.val();if(typeof v==='string'){try{applyingRemote=true;cloudReady=true;state=migrate(JSON.parse(v));try{localStorage.setItem(LS_KEY,JSON.stringify(state));}catch(e){}recordHistory();render();}catch(e){}applyingRemote=false;}});
+  /* CACHE ONLY AFTER A SUCCESSFUL RENDER. This used to write localStorage BEFORE
+     rendering, inside a catch that swallowed the error whole. So a board update
+     that migrate() accepted but render() choked on was stored on every device
+     that happened to be connected, in silence -- the running page kept its old
+     screen, so nobody saw anything wrong. The next person to RELOAD that board
+     then got a dead page, often days later and on a different device. Render
+     first, keep the previous board if it fails, and never cache what didn't
+     display. */
+  cloudRef.on('value',snap=>{const v=snap.val();if(typeof v!=='string')return;
+    const prev=state,prevHist=histLast;
+    try{
+      applyingRemote=true;cloudReady=true;
+      state=migrate(JSON.parse(v));
+      recordHistory();render();
+      try{LS.setItem(LS_KEY,JSON.stringify(state));}catch(e){}
+    }catch(e){
+      /* recordHistory() runs BEFORE render(), so by the time render throws it has
+         already moved histLast onto the rejected board. Restoring state alone would
+         leave undo diffing against a board that was never displayed -- and undo
+         would then write that phantom board back. Roll both back, and redraw so the
+         screen matches the board we kept. */
+      state=prev;histLast=prevHist;
+      console.error("Ignored an unusable board update from the cloud - kept the previous board.",e);
+      try{render();}catch(_){}
+    }
+    applyingRemote=false;});
   cloudRef.once('value').then(s=>{if(s.val()==null){try{cloudRef.set(JSON.stringify(state));}catch(e){}}});
 }
 function doLogin(){let u=$("loginEmail").value.trim();const p=$("loginPwd").value;if(!u||!p){$("loginErr").textContent="Enter username and password.";return;}
@@ -804,12 +912,23 @@ function initCloud(){
 function tick(){$("clock").textContent=nowHM();if(!/INPUT|SELECT|TEXTAREA/.test(document.activeElement.tagName))render();}
 $("arriveName").addEventListener("keydown",e=>{if(e.key==="Enter")arrive();});
 document.addEventListener("click",e=>{const m=$("moreMenu");if(m&&m.classList.contains("show")&&!e.target.closest(".menu-wrap"))m.classList.remove("show");});
-updateAddMode();render();$("clock").textContent=nowHM();histLast=JSON.stringify(state);updateUndoBtn();
+updateAddMode();
+/* A saved board that cannot be displayed must not take the page down with it:
+   drop it and start clean, and the cloud refills everything a moment later. */
+try{render();}catch(e){console.error("Saved board could not be displayed - starting clean.",e);
+  try{LS.removeItem(LS_KEY);}catch(_){}state=freshState();
+  /* If even a clean board will not draw, carry on anyway: the clock, the sign-in
+     box and the cloud listener all still work, and the next good snapshot from
+     the cloud may well render. Throwing here would kill boot outright, which is
+     the exact outcome this guard exists to avoid. */
+  try{render();}catch(e2){console.error("A clean board could not be displayed either.",e2);}}
+$("clock").textContent=nowHM();histLast=JSON.stringify(state);updateUndoBtn();
 if(FIREBASE_CONFIG&&window.firebase){$("loginOverlay").classList.add("show");}
 initCloud();
 setInterval(()=>{$("clock").textContent=nowHM();},1000);
 setInterval(tick,20000);
 autoBackup();setInterval(autoBackup,600000);
+window.__rfBooted=true;
 </script>
 </body>
 </html>
