@@ -126,6 +126,7 @@
   .txname{cursor:pointer}
   .txchip.done{background:#e6f4ea;border-color:#9cc4a8;color:#256b39;text-decoration:line-through}
   .txin{flex:1;min-width:80px;font-size:13px;padding:5px 7px}
+  select.txin{flex:1 1 104px;min-width:104px;max-width:100%}
   .selCompact{flex:1;min-width:0;font-size:13px;padding:5px 7px}
   .note-in{font-size:13px}
   .actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px}
@@ -221,6 +222,7 @@
         <select id="arriveDoc" title="Doctor" style="width:120px"></select>
         <input id="arriveTime" class="timein" placeholder="time e.g. 345" style="width:100px">
         <input id="arriveTx" list="txList" placeholder="Treatment" style="width:140px">
+        <select id="arriveTxSel" title="pick from the treatment list" style="width:86px" onchange="arrivePickTx(this)"></select>
         <button class="btn" id="arriveBtn" onclick="arrive()">+ Add appointment</button>
       </div>
       <div id="roomsHost"></div>
@@ -382,6 +384,15 @@ function parseTimeInput(s){s=(s||"").trim().toLowerCase();if(!s)return"";let pm=
 function hm12(hm){if(!hm)return"";let[h,m]=hm.split(":").map(Number);let ap=h>=12?'PM':'AM';let hh=h%12;if(hh===0)hh=12;return hh+":"+pad(m)+" "+ap;}
 function txDisp(t){return txArr(t).join(" + ");}
 function txChips(t,prefix){return txArr(t).map((x,i)=>`<span class="txchip">${esc(x)}<b onclick="${prefix}${i})">✕</b></span>`).join('');}
+// Treatment picker. These used to be text inputs with list="txList", but an
+// iPad never opens a <datalist> — the box looked like an empty text field and
+// the treatment list was simply invisible on the clinic iPads. A real <select>
+// gets the native iPad picker; "Other…" keeps free typing available.
+function txOpts(label){return ['<option value="">'+label+'</option>'].concat(state.treatments.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`)).concat('<option value="__other__">Other…</option>').join('');}
+function txAddSel(fn,arg,label){return `<select class="txin" title="add a treatment" onchange="txPick(this,${fn},${arg})">${txOpts(label)}</select>`;}
+function txPick(sel,fn,arg){let v=sel.value;sel.value="";if(!v)return;
+  if(v==="__other__"){v=(prompt("Treatment name")||"").trim();if(!v)return;}
+  fn(arg,v);}
 function fillSel(id,html){const el=$(id);if(!el)return;const v=el.value;el.innerHTML=html;el.value=v;}
 function sendRoomOpts(label){return ['<option value="">'+label+'</option>'].concat(freeRooms().map(r=>`<option>${esc(r)}</option>`)).join('');}
 
@@ -401,6 +412,10 @@ function arrive(){const name=$("arriveName").value.trim();if(!name){toast("Type 
   const txs=$("arriveTx").value.split(",").map(s=>s.trim()).filter(Boolean);
   state.queue.push({id:nextId(),customer:name,doctor:doc||c.doctor||"",therapist:c.therapist||"",treatment:txs,appt:parseTimeInput($("arriveTime").value),arrivedAt:addWalkIn?nowHM():""});
   $("arriveName").value="";$("arriveTx").value="";$("arriveDoc").value="";$("arriveTime").value="";commit();}
+function arrivePickTx(sel){let v=sel.value;sel.value="";if(!v)return;
+  if(v==="__other__"){v=(prompt("Treatment name")||"").trim();if(!v)return;}
+  const el=$("arriveTx"),cur=el.value.split(",").map(s=>s.trim()).filter(Boolean);
+  if(!cur.includes(v))cur.push(v);el.value=cur.join(", ");}
 function setCustDoc(name,v){if(name){state.customers[name]=state.customers[name]||{doctor:"",therapist:""};state.customers[name].doctor=v;}}
 function qSetDoctor(id,v){const q=state.queue.find(x=>x.id==id);if(q){q.doctor=v;setCustDoc(q.customer,v);editingDocId=null;commit();}}
 function qSetAppt(id,v){const q=state.queue.find(x=>x.id==id);if(q){q.appt=v;editingTimeId=null;commit();}}
@@ -609,6 +624,7 @@ function render(){
   const _ds=$("dateStamp");if(_ds){const _d=new Date(),_M=["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];_ds.textContent=(state.syncDate||(pad(_d.getDate())+"/"+_M[_d.getMonth()]+"/"+_d.getFullYear())).replace(/\//g,' ');}
   $("custList").innerHTML=Object.keys(state.customers||{}).sort().map(n=>`<option value="${esc(n)}">`).join('');
   $("txList").innerHTML=state.treatments.map(t=>`<option value="${esc(t)}">`).join('');
+  fillSel("arriveTxSel",txOpts("pick…"));
   fillSel("arriveDoc",docOptions(""));
   let html="";state.groups.forEach(g=>{html+=`<div class="group-title">${esc(g.name)}</div><div class="rooms-grid">`+g.rooms.map(roomCard).join('')+`</div>`;});
   $("roomsHost").innerHTML=html;
@@ -640,7 +656,7 @@ function roomCard(room){
       <div class="fieldrow"><label>Doctor</label><div style="flex:1;display:flex;align-items:center;gap:4px;padding-top:6px">${docEl}</div></div>
       ${o.consult?'':`<div class="fieldrow"><label>Thera.</label><div style="flex:1;display:flex;align-items:center;gap:4px;padding-top:6px">${theraEl}</div></div>`}
       ${consultBlock(room,o)}
-      <div class="fieldrow"><label>Tx</label><div class="txwrap">${remChips}<input class="txin" list="txList" placeholder="+ add" onchange="roomTxAdd('${jsq(room)}',this.value);this.value=''"></div></div>
+      <div class="fieldrow"><label>Tx</label><div class="txwrap">${remChips}${txAddSel('roomTxAdd',"'"+jsq(room)+"'",'+ add ▾')}</div></div>
       ${doneChips?`<div class="fieldrow"><label>Done</label><div class="txwrap">${doneChips}</div></div>`:''}
       ${o.consult?'':(o.mask?`<div class="fieldrow"><label>Mask off</label><div style="flex:1;padding-top:6px"><b>${esc(hm12(o.mask))}</b><span class="mstep"><button title="+1 min" onclick="maskBump('${jsq(room)}',1)">▲</button><button title="-1 min" onclick="maskBump('${jsq(room)}',-1)">▼</button></span>${maskRel(o.mask)} <button class="maskx" title="clear mask-off time" onclick="maskClear('${jsq(room)}')">✕</button></div></div>`:`<div class="fieldrow maskrow"><label style="width:auto">Mask</label><span class="hint">on for:</span><button class="chip" onclick="maskIn('${jsq(room)}',5)">5m</button><button class="chip" onclick="maskIn('${jsq(room)}',10)">10m</button><button class="chip" onclick="maskIn('${jsq(room)}',15)">15m</button><span class="maskbreak"></span><span class="mhidden">Mask</span><span class="hint mhidden">on for:</span><input class="timein" title="exact time" placeholder="e.g. 345" onchange="roomSet('${jsq(room)}','mask',parseTimeInput(this.value))"></div>`)}
       ${noteRow(room,o)}
@@ -670,7 +686,7 @@ function renderWaiting(){
       <div class="qmeta" style="display:flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);min-width:0">${docInline(q.id,q.doctor)}${q.appt?' · '+esc(hm12(q.appt)):''}</div>
       <div class="qmeta" style="display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:3px">${qConsultBadge(q)}${theraInlineWaiting(q.id,q.therapist)}</div>
       ${qConsultDetail(q)}
-      <div class="txwrap">${txChips(q.treatment,`qTxRemove(${q.id},`)}<input class="txin" list="txList" placeholder="+ tx" onchange="qTxAdd(${q.id},this.value);this.value=''"></div>
+      <div class="txwrap">${txChips(q.treatment,`qTxRemove(${q.id},`)}${txAddSel('qTxAdd',q.id,'+ tx ▾')}</div>
       <div style="display:flex;gap:6px;align-items:center"><select onchange="moveQueueToRoom(${q.id},this.value)" style="flex:1">${sendRoomOpts('→ room ▾')}</select><button class="btn sm grey" title="Clicked Arrived by mistake — send back to appointments" onclick="qCheckIn(${q.id})">↩ appts</button><button class="btn sm grey" title="Remove customer (logged in Records)" onclick="removeQueue(${q.id})">✕</button></div></div>`;});
   $("waitPanel").innerHTML=html;
 }
@@ -696,7 +712,7 @@ function qCard(q){
       <div class="qleft">${timeEl}<span class="qname">${esc(q.customer)}</span><span class="qdoc">${docEl}</span></div>
       <div class="qright"><button class="chip" onclick="qCheckIn(${q.id})">✓ Arrived</button><button class="qmore" title="more" onclick="toggleQ(${q.id})">${open?'▴ less':'⋯ more'}</button></div>
     </div>`;
-  if(open){h+=`<div class="qexp"><div class="txwrap">${txChips(q.treatment,`qTxRemove(${q.id},`)}<input class="txin" list="txList" placeholder="+ treatment" onchange="qTxAdd(${q.id},this.value);this.value=''"></div><div class="qrowB"><select class="sendSel" onchange="moveQueueToRoom(${q.id},this.value)">${sendRoomOpts('Send to room ▾')}</select><button class="qx" title="Remove" onclick="removeQueue(${q.id})">✕</button></div></div>`;}
+  if(open){h+=`<div class="qexp"><div class="txwrap">${txChips(q.treatment,`qTxRemove(${q.id},`)}${txAddSel('qTxAdd',q.id,'+ treatment ▾')}</div><div class="qrowB"><select class="sendSel" onchange="moveQueueToRoom(${q.id},this.value)">${sendRoomOpts('Send to room ▾')}</select><button class="qx" title="Remove" onclick="removeQueue(${q.id})">✕</button></div></div>`;}
   return h+`</div>`;
 }
 
